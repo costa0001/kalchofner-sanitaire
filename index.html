@@ -238,6 +238,10 @@ input,select,textarea{width:100%;font:16px var(--f);padding:15px 18px;border:1.5
 input:focus,select:focus,textarea:focus{border-color:var(--blue);outline:none}
 textarea{min-height:110px;resize:vertical}
 .sent{background:#fff;border-radius:22px;padding:30px;font-size:18px}
+.sent b{display:block;font-size:24px;margin-bottom:6px}
+.legal{font-size:13px;line-height:1.5;color:var(--ink-2);margin-top:2px}
+.formerr{font-size:15px;color:#b4231a;background:#ffe3e0;border-radius:12px;padding:12px 14px}
+#sendbtn[disabled]{opacity:.6;cursor:wait}
 
 footer{padding:70px 0 50px;color:var(--ink-2);font-size:15px}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;border-top:1px solid var(--rule);padding-top:30px}
@@ -499,12 +503,14 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
       <h3 data-fr="Demander un devis gratuit" data-en="Request a free quote">Demander un devis gratuit</h3>
       <form id="quote">
         <div class="two">
-          <div><label for="n" data-fr="Nom" data-en="Name">Nom</label><input id="n" autocomplete="name" required></div>
-          <div><label for="t" data-fr="Téléphone" data-en="Phone">Téléphone</label><input id="t" type="tel" autocomplete="tel" required></div>
+          <div><label for="n" data-fr="Nom" data-en="Name">Nom</label><input id="n" name="Nom" autocomplete="name" required></div>
+          <div><label for="t" data-fr="Téléphone" data-en="Phone">Téléphone</label><input id="t" name="Telephone" type="tel" autocomplete="tel" required></div>
         </div>
-        <div><label for="k" data-fr="Type de travaux" data-en="Type of work">Type de travaux</label><select id="k"><option data-fr="Rénovation de salle de bain" data-en="Bathroom renovation">Rénovation de salle de bain</option><option data-fr="Dépannage" data-en="Repair">Dépannage</option><option data-fr="Chauffe-eau" data-en="Water heater">Chauffe-eau</option><option data-fr="Entretien" data-en="Maintenance">Entretien</option></select></div>
-        <div><label for="m" data-fr="Votre projet en quelques mots" data-en="Your project in a few words">Votre projet en quelques mots</label><textarea id="m"></textarea></div>
-        <button class="btn btn-blue" type="submit" data-fr="Envoyer la demande" data-en="Send request">Envoyer la demande</button>
+        <div><label for="k" data-fr="Type de travaux" data-en="Type of work">Type de travaux</label><select id="k" name="Type de travaux"><option data-fr="Rénovation de salle de bain" data-en="Bathroom renovation">Rénovation de salle de bain</option><option data-fr="Dépannage" data-en="Repair">Dépannage</option><option data-fr="Chauffe-eau" data-en="Water heater">Chauffe-eau</option><option data-fr="Entretien" data-en="Maintenance">Entretien</option></select></div>
+        <div><label for="m" data-fr="Votre projet en quelques mots" data-en="Your project in a few words">Votre projet en quelques mots</label><textarea id="m" name="Message"></textarea><input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px"></div>
+        <button class="btn btn-blue" type="submit" id="sendbtn" data-fr="Envoyer la demande" data-en="Send request">Envoyer la demande</button>
+        <p class="legal" data-fr="Vos données servent uniquement à traiter votre demande. Elles ne sont ni vendues ni utilisées à des fins publicitaires, conformément à la loi fédérale sur la protection des données (nLPD)." data-en="Your details are used only to handle your request. They are never sold or used for advertising, in line with the Swiss Federal Act on Data Protection (nFADP).">Vos données servent uniquement à traiter votre demande. Elles ne sont ni vendues ni utilisées à des fins publicitaires, conformément à la loi fédérale sur la protection des données (nLPD).</p>
+        <p class="formerr" id="formerr" hidden></p>
       </form>
     </div>
   </section>
@@ -545,7 +551,27 @@ function setLang(l){
   render();openNow();
 }
 document.querySelectorAll('.lang button').forEach(function(b){b.addEventListener('click',function(){setLang(b.dataset.lang)})});
-document.getElementById('quote').addEventListener('submit',function(e){e.preventDefault();this.outerHTML='<div class="sent">'+(lang==='fr'?"Merci, votre demande est prête. Ceci est une maquette : aucun message n'a été envoyé.":'Thanks, your request is ready. This is a mock-up: no message was sent.')+'</div>'});
+document.getElementById('quote').addEventListener('submit',function(e){
+  e.preventDefault();
+  var form=this,btn=document.getElementById('sendbtn'),err=document.getElementById('formerr');
+  var data={};new FormData(form).forEach(function(v,k){data[k]=v});
+  if(data._honey){return}
+  delete data._honey;
+  data._subject='Nouvelle demande de devis - site Kalchofner';
+  data._template='table';data._captcha='false';data.Langue=lang.toUpperCase();
+  btn.disabled=true;err.hidden=true;
+  btn.textContent=lang==='fr'?'Envoi en cours…':'Sending…';
+  fetch('https://formsubmit.co/ajax/costadisk0001@gmail.com',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(data)})
+  .then(function(r){return r.json().then(function(j){if(!r.ok||String(j.success)!=='true')throw new Error(j.message||'error');})})
+  .then(function(){
+    form.outerHTML='<div class="sent"><b>'+(lang==='fr'?'Merci, votre demande est envoyée.':'Thank you, your request has been sent.')+'</b>'+(lang==='fr'?'Nous vous rappelons dans les plus brefs délais. Pour une urgence, appelez le 022 343 00 13.':'We will call you back shortly. For an emergency, call 022 343 00 13.')+'</div>';
+  })
+  .catch(function(){
+    btn.disabled=false;btn.textContent=lang==='fr'?'Envoyer la demande':'Send request';
+    err.textContent=lang==='fr'?"La demande n'a pas pu être envoyée. Vérifiez votre connexion et réessayez, ou appelez le 022 343 00 13.":"The request could not be sent. Check your connection and try again, or call 022 343 00 13.";
+    err.hidden=false;
+  });
+});
 render();openNow();
 </script>
 
